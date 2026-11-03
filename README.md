@@ -1,3 +1,25 @@
+> ### ⚠️ This is a patched fork, not upstream AlphaFlow
+>
+> Branch [`macos-arm64`](../../tree/macos-arm64) runs **ESMFlow on Apple Silicon
+> (CPU or MPS)**. Upstream requires CUDA (`torch==1.12.1+cu113` and OpenFold's CUDA
+> kernels), which does not exist on an arm64 Mac. Changes:
+>
+> | File | Change | Why |
+> |---|---|---|
+> | `predict.py` | New `--device {cpu,mps,cuda}` (default `cpu`); the five hardcoded `.cuda()` calls became `.to(device)` | Nothing else needed changing — the model wrapper already derives its device from the batch |
+> | `alphaflow/model/esmfold.py` | `self.esm.half()` gated behind `ESMFLOW_ESM_HALF=1` | fp16 is fine on CUDA/MPS, but many half ops on CPU are unimplemented or very slow, so fp32 is the safer default (`cfg.model.fp16_esm` is unused upstream) |
+> | `MAC_INSTALL.md` | New | The arm64 install: substituted dependency pins, the CPU-only OpenFold build, and how to run |
+> | `test_gb1.csv` | New | 56-residue GB1, a fast smoke-test input |
+>
+> No modelling code or weights are changed — this is a portability fork only.
+>
+> OpenFold is installed from a [matching patched fork](https://github.com/JunfengWu163/openfold/tree/macos-arm64-103d037)
+> (two NumPy-1.24 fixes on top of the pinned `103d037`). **Follow
+> [MAC_INSTALL.md](MAC_INSTALL.md) instead of the Installation section below**,
+> which is CUDA-only.
+>
+> Upstream README follows, unchanged.
+
 # AlphaFlow
 
 AlphaFlow is a modified version of AlphaFold, fine-tuned with a flow matching objective, designed for generative modeling of protein conformational ensembles. In particular, AlphaFlow aims to model:

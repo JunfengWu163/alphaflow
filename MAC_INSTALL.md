@@ -26,7 +26,7 @@ Versions installed (upstream pin -> what was used, and why):
 | dm-tree | 0.1.6 | 0.1.8 | first version with arm64 wheels |
 | mdtraj | 1.9.9 | 1.10.3 | arm64 wheel |
 | pytorch_lightning | 2.0.4 | 2.6.6 | compatibility with torch 2.14 |
-| openfold | git@103d037 | git@103d037 | unchanged, built CPU-only (see below) |
+| openfold | `aqlaboratory@103d037` | [`JunfengWu163@macos-arm64-103d037`](https://github.com/JunfengWu163/openfold/tree/macos-arm64-103d037) | same commit + 2 NumPy-1.24 fixes; built CPU-only (see below) |
 
 ## Why OpenFold builds at all
 
@@ -36,7 +36,12 @@ from `softmax_cuda_stub.cpp` instead of the CUDA kernel, with only `-O3` as a
 compile flag. That compiles cleanly under Apple clang. It must be installed with
 `--no-build-isolation` because `setup.py` imports torch at build time:
 
-    pip install --no-build-isolation 'openfold @ git+https://github.com/aqlaboratory/openfold.git@103d037'
+    pip install --no-build-isolation \
+        'openfold @ git+https://github.com/JunfengWu163/openfold.git@macos-arm64-103d037'
+
+That fork is upstream `103d037` plus the two NumPy fixes described below. Installing
+it this way makes the fixes a pinned dependency rather than a hand-edit to
+`site-packages` that the next reinstall would silently revert.
 
 Note: `import attn_core_inplace_cuda` fails on its own (`libc10.dylib` not on the
 rpath) but succeeds once torch is imported first, which is how OpenFold always
@@ -45,16 +50,25 @@ memory-efficient-attention path, which ESMFlow inference does not use.
 
 ## Patches applied
 
-Originals are kept next to each file as `*.orig`.
+All of these are committed to forks, so nothing here depends on a hand-edited
+working copy. Pre-patch originals are recoverable from each repo's `upstream` remote.
 
-1. `site-packages/openfold/data/templates.py` — `np.object` -> `object`
-   (removed in NumPy 1.24). Same for `np.bool` in `openfold/np/relax/utils.py`.
-   **These live in site-packages and will be lost if openfold is reinstalled.**
+### In the OpenFold fork (`JunfengWu163/openfold`, branch `macos-arm64-103d037`)
+
+1. `openfold/data/templates.py` — `np.object` -> `object`, and
+   `openfold/np/relax/utils.py` — `np.bool` -> `bool`. Both aliases were removed in
+   NumPy 1.24. The first is at module scope, so OpenFold cannot be imported at all
+   without it (the alternative is pinning `numpy<1.24`). Semantically no-ops.
+
+### In this repo (`JunfengWu163/alphaflow`, branch `macos-arm64`)
+
 2. `predict.py` — added `--device {cpu,mps,cuda}` (default `cpu`) and replaced the
-   five hardcoded `.cuda()` calls with `.to(device)`.
+   five hardcoded `.cuda()` calls with `.to(device)`. The model wrapper already
+   derives its device from the batch, so nothing else needed changing.
 3. `alphaflow/model/esmfold.py` — `self.esm.half()` is now gated behind
    `ESMFLOW_ESM_HALF=1`. fp16 is fine on CUDA/MPS but many half ops are
-   unimplemented or very slow on CPU, so the default is fp32.
+   unimplemented or very slow on CPU, so the default is fp32. (`cfg.model.fp16_esm`
+   is unused upstream.)
 
 ## Weights
 
