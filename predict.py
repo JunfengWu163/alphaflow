@@ -19,6 +19,7 @@ parser.add_argument('--self_cond', action='store_true', default=False)
 parser.add_argument('--noisy_first', action='store_true', default=False)
 parser.add_argument('--runtime_json', type=str, default=None)
 parser.add_argument('--no_overwrite', action='store_true', default=False)
+parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'mps', 'cuda'])
 args = parser.parse_args()
 
 import torch, tqdm, os, wandb, json, time
@@ -38,6 +39,7 @@ from alphaflow.config import model_config
 from alphaflow.utils.logging import get_logger
 logger = get_logger(__name__)
 torch.set_float32_matmul_precision("high")
+device = torch.device(args.device)
 
 config = model_config(
     'initial_training',
@@ -76,7 +78,7 @@ def main():
         ckpt = torch.load(args.weights, map_location='cpu', weights_only=False) # Compatible with pytorch = 2.6.0
         model = model_class(**ckpt['hyper_parameters'], training=False)
         model.model.load_state_dict(ckpt['params'], strict=False)
-        model = model.cuda()
+        model = model.to(device)
         
     
     elif args.original_weights:
@@ -86,16 +88,16 @@ def main():
             model_data = torch.load(path, map_location='cpu')
             model_state = model_data["model"]
             model.model.load_state_dict(model_state, strict=False)
-            model = model.to(torch.float).cuda()
+            model = model.to(torch.float).to(device)
             
         elif args.mode == 'alphafold':
             import_jax_weights_(model.model, 'params_model_1.npz', version='model_3')
-            model = model.cuda()
+            model = model.to(device)
         
     else:
         model = model_class.load_from_checkpoint(args.ckpt, map_location='cpu')
         model.load_ema_weights()
-        model = model.cuda()
+        model = model.to(device)
     model.eval()
     
     logger.info("Model has been loaded")
@@ -114,7 +116,7 @@ def main():
                 item = valset[i] # resample MSA
             
             batch = collate_fn([item])
-            batch = tensor_tree_map(lambda x: x.cuda(), batch)  
+            batch = tensor_tree_map(lambda x: x.to(device), batch)  
             start = time.time()
             prots = model.inference(batch, as_protein=True, noisy_first=args.noisy_first,
                         no_diffusion=args.no_diffusion, schedule=schedule, self_cond=args.self_cond)

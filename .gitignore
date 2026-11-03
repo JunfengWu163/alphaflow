@@ -1,0 +1,15 @@
+# model weights (multi-GB, fetched separately - see MAC_INSTALL.md)
+weights/
+*.pt
+
+# inference output
+outpdb/
+workdir/
+
+# local backups of pre-patch files (originals are in git history)
+*.orig
+
+__pycache__/
+*.py[cod]
+.DS_Store
+wandb/

@@ -2,6 +2,7 @@
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+import os
 import typing as T
 from functools import partial
 
@@ -57,7 +58,10 @@ class ESMFold(nn.Module):
         self.esm, self.esm_dict = esm_registry.get(cfg.esm_type)()
 
         self.esm.requires_grad_(False)
-        self.esm.half()
+        # fp16 is fine on CUDA/MPS but many half ops are unimplemented or
+        # extremely slow on CPU, so keep fp32 unless explicitly asked.
+        if os.environ.get('ESMFLOW_ESM_HALF', '0') == '1':
+            self.esm.half()
 
         self.esm_feats = self.esm.embed_dim
         self.esm_attns = self.esm.num_layers * self.esm.attention_heads
